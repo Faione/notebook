@@ -11,3 +11,5 @@
 *.tmp
 *.temp
 
+# mdBook
+book/

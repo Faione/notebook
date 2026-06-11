@@ -1,0 +1,15 @@
+[book]
+title = "Notebook"
+description = "Personal markdown notebook"
+authors = ["Faione"]
+language = "zh-CN"
+src = "."
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/Faione/notebook"
+edit-url-template = "https://github.com/Faione/notebook/edit/main/{path}"
+site-url = "/notebook/"
