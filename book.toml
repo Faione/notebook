@@ -13,3 +13,9 @@ create-missing = false
 git-repository-url = "https://github.com/Faione/notebook"
 edit-url-template = "https://github.com/Faione/notebook/edit/main/{path}"
 site-url = "/notebook/"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

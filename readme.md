@@ -15,8 +15,9 @@ lowercase snake_case.
 - Avoid Chinese characters, spaces, hyphens, and mixed casing in paths.
 - Keep names descriptive but short, such as `model_skills` or `outline.md`.
 - Apply these rules to both existing notes and newly added notes.
-- Repository metadata and tool convention files, such as `.gitignore`,
-  `book.toml`, `SUMMARY.md`, and `.github/workflows/*.yml`, are exempt.
+- Repository metadata, generated site assets, and tool convention files, such
+  as `.gitignore`, `book.toml`, `SUMMARY.md`, `mermaid-init.js`,
+  `mermaid.min.js`, and `.github/workflows/*.yml`, are exempt.
 
 ## Documentation Rules
 
@@ -35,5 +36,6 @@ This repository is deployed as an mdBook site through GitHub Pages.
 
 - `book.toml` defines the mdBook configuration.
 - `SUMMARY.md` defines the table of contents.
+- `mdbook-mermaid` renders Mermaid flowcharts in the generated site.
 - `.github/workflows/deploy_mdbook.yml` builds and deploys the site on pushes
   to `main`.

@@ -23,8 +23,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install mdBook
-        run: cargo install mdbook --locked
+      - name: Install mdBook tooling
+        run: |
+          cargo install mdbook --version 0.5.0 --locked
+          cargo install mdbook-mermaid --version 0.17.0 --locked
 
       - name: Build
         run: mdbook build
