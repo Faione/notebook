@@ -1,7 +1,5 @@
 # Summary
 
-- [Notebook](readme.md)
-
 # AI
 
 - [Skills, MCP, and LoRA comparison](ai/skills_mcp_lora_comparison.md)
