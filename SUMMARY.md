@@ -26,4 +26,6 @@
 ## Model skills
 
 - [Agent Skills guide notes](ai/model_skills/agent_skills_guide_notes.md)
+- [Agent engineering](ai/model_skills/agent_engineering.md)
+- [Skill, MCP, and Agent decision guide](ai/model_skills/skill_mcp_agent_decision_guide.md)
 - [Skill writing methodology](ai/model_skills/skill_writing_methodology.md)
