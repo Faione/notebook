@@ -3,12 +3,14 @@
 # AI foundations
 
 - [Skills, MCP, and LoRA comparison](ai/skills_mcp_lora_comparison.md)
+- [Large language model fundamentals](ai/ai_infra/large_language_model_fundamentals.md)
 
 # AI infrastructure
 
 ## System overview
 
 - [AI infra outline](ai/ai_infra/outline.md)
+- [LLM model and inference basics](ai/ai_infra/llm_inference_basics.md)
 
 ## Routing and orchestration
 
