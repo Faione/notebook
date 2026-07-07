@@ -78,6 +78,42 @@ BPE / subword:
 
 ### 3.3 BPE 的基本流程
 
+BPE 全称是 **Byte Pair Encoding（字节对编码）**。它最初是一种数据压缩算法，后来被改造为 NLP 中常用的子词 tokenization 方法。
+
+它的核心思想是：
+
+> 从最细粒度的基本 token 开始，不断找出语料中出现频率最高的相邻 token 对，并把这一对合并成一个新 token。
+
+经过多轮合并后：
+
+- 常见的词或片段会被表示成较少的 token。
+- 罕见词可以拆成多个较小的 token。
+- vocabulary 大小可以通过合并轮数控制。
+- 新词不需要统一映射为 `UNK`，因为仍可退回到基本字符或 byte。
+
+例如，假设语料里多次出现 `low`、`lower`：
+
+```text
+初始:
+l o w
+l o w e r
+
+发现 "l o" 出现频繁，合并:
+lo w
+lo w e r
+
+发现 "lo w" 出现频繁，继续合并:
+low
+low e r
+```
+
+最终，常见片段 `low` 成为一个 token，而 `lower` 可以表示成 `[low, e, r]`。实际的 byte-level BPE 从 UTF-8 bytes 开始，因此原则上可以表示任意输入文本。
+
+需要区分两个阶段：
+
+1. **训练 tokenizer**：在语料中统计频率，学习 vocabulary 和 merge rules。
+2. **使用 tokenizer**：按已经学好的 merge rules，把新文本编码成 token ids。
+
 ```mermaid
 flowchart TD
   A["Raw text"] --> B["Convert to bytes"]

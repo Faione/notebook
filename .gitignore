@@ -10,6 +10,7 @@
 # Temporary files
 *.tmp
 *.temp
+tmp/
 
 # mdBook
 book/

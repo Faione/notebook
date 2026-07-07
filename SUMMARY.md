@@ -7,10 +7,20 @@
 
 # AI infrastructure
 
-## System overview
+## Overview and stack
 
 - [AI infra outline](ai/ai_infra/outline.md)
+- [GPU to LLM app stack](ai/ai_infra/gpu_to_llm_app_stack.md)
+
+## Model and inference basics
+
 - [LLM model and inference basics](ai/ai_infra/llm_inference_basics.md)
+- [LLM inference frameworks](ai/ai_infra/llm_inference_frameworks.md)
+
+## Kernel and deployment optimization
+
+- [Operator optimization](ai/ai_infra/operator_optimization.md)
+- [LLM quantization basics](ai/ai_infra/llm_quantization.md)
 
 ## Routing and orchestration
 
@@ -51,7 +61,30 @@
 
 - [Agent Skills guide notes](ai/model_skills/agent_skills_guide_notes.md)
 - [Skill writing methodology](ai/model_skills/skill_writing_methodology.md)
+- [Agent-friendly CLI design](ai/model_skills/agent_friendly_cli_design.md)
 
 ## Skill, MCP, and Agent selection
 
 - [Skill, MCP, and Agent decision guide](ai/model_skills/skill_mcp_agent_decision_guide.md)
+
+# Papers
+
+## AI papers
+
+- [Attention Is All You Need](papers/attention_is_all_you_need/attention_is_all_you_need.md)
+- [Transformer algorithm and CUDA implementations](papers/attention_is_all_you_need/transformer_algorithm_and_cuda.md)
+
+# Software engineering
+
+## Static analysis
+
+### Foundations
+
+- [Program analysis fundamentals](software/static_analysis/program_analysis_fundamentals.md)
+- [Static analysis method map](software/static_analysis/static_analysis_method_map.md)
+- [Static analysis engineering practice](software/static_analysis/static_analysis_engineering_practice.md)
+
+### Clang ecosystem
+
+- [Clang Static Analyzer](software/static_analysis/clang_static_analyzer.md)
+- [Clang CTU analysis](software/static_analysis/clang_ctu_analysis.md)
