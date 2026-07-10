@@ -72,6 +72,7 @@
 ## AI papers
 
 - [Attention Is All You Need](papers/attention_is_all_you_need/attention_is_all_you_need.md)
+- [Transformer prerequisites](papers/attention_is_all_you_need/transformer_prerequisites.md)
 - [Transformer algorithm and CUDA implementations](papers/attention_is_all_you_need/transformer_algorithm_and_cuda.md)
 
 # Software engineering
@@ -87,4 +88,5 @@
 ### Clang ecosystem
 
 - [Clang Static Analyzer](software/static_analysis/clang_static_analyzer.md)
+- [Clang Static Analyzer default checkers](software/static_analysis/clang_static_analyzer_default_checkers.md)
 - [Clang CTU analysis](software/static_analysis/clang_ctu_analysis.md)
