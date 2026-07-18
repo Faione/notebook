@@ -72,7 +72,21 @@
 ## AI papers
 
 - [Attention Is All You Need](papers/attention_is_all_you_need/attention_is_all_you_need.md)
-- [Transformer prerequisites](papers/attention_is_all_you_need/transformer_prerequisites.md)
+- [Transformer learning path](papers/attention_is_all_you_need/transformer_prerequisites.md)
+- [Machine learning prerequisites](papers/attention_is_all_you_need/machine_learning_prerequisites.md)
+- [RoPE: Rotary Position Embedding](papers/attention_is_all_you_need/rotary_position_embedding.md)
+- [Transformer architecture](papers/attention_is_all_you_need/transformer_architecture.md)
+- [Transformer attention](papers/attention_is_all_you_need/transformer_attention.md)
+- [Trained Transformer and LLM composition](papers/attention_is_all_you_need/transformer_model_composition.md)
+- [Decoder-only LLM](papers/attention_is_all_you_need/decoder_only_llm.md)
+- [Decoder-only LLM computation](papers/attention_is_all_you_need/decoder_only_llm_computation.md)
+- [Decoder-only LLM training](papers/attention_is_all_you_need/decoder_only_llm_training.md)
+- [Decoder-only LLM inference](papers/attention_is_all_you_need/decoder_only_llm_inference.md)
+- [Decoder-only LLM Prefill](papers/attention_is_all_you_need/decoder_only_llm_prefill.md)
+- [Decoder-only LLM Decode](papers/attention_is_all_you_need/decoder_only_llm_decode.md)
+- [From Attention Is All You Need to LLM](papers/attention_is_all_you_need/llm_reading_guide.md)
+- [Transformer training](papers/attention_is_all_you_need/transformer_training.md)
+- [Transformer inference](papers/attention_is_all_you_need/transformer_inference.md)
 - [Transformer algorithm and CUDA implementations](papers/attention_is_all_you_need/transformer_algorithm_and_cuda.md)
 
 # Software engineering
@@ -88,5 +102,5 @@
 ### Clang ecosystem
 
 - [Clang Static Analyzer](software/static_analysis/clang_static_analyzer.md)
-- [Clang Static Analyzer default checkers](software/static_analysis/clang_static_analyzer_default_checkers.md)
+- [Clang Static Analyzer checkers](software/static_analysis/clang_static_analyzer_default_checkers.md)
 - [Clang CTU analysis](software/static_analysis/clang_ctu_analysis.md)

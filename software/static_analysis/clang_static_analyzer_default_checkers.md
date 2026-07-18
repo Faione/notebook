@@ -1,10 +1,50 @@
-# Clang Static Analyzer Default Checkers
+# Clang Static Analyzer Checkers
 
-调研日期：2026-07-07
+调研日期：2026-07-16
 
-本文整理 Clang Static Analyzer 官方文档中 `Default Checkers` 章节列出的 checker，并简要说明每个 checker 主要检查的问题。这里的“default checkers”指官方文档该章节下的分组范围，不包含 `alpha.*` 实验 checker 和 `debug.*` 开发调试 checker。
+本文整理 Clang Static Analyzer 官方文档中已经提供的 C/C++ 相关 checker，并按照 checker 的演进状态、规则能力和工程使用边界进行分类。Objective-C、Cocoa 本地化、macOS Objective-C 引用计数等非 C/C++ 重点规则不作为本文关注范围。
 
-官方入口：[Available Checkers](https://clang.llvm.org/docs/analyzer/checkers.html#default-checkers)
+官方入口：[Available Checkers](https://clang.llvm.org/docs/analyzer/checkers.html)
+
+## 官方分类总览
+
+官方文档将 checker 分为 default、experimental 和 debug 三类。Default checker 面向普通用户；`alpha.*` checker 处于开发或实验阶段，默认关闭，可能崩溃或产生更多误报；`debug.*` checker 面向 analyzer 开发者，用于观察 CFG、调用图、`ExplodedGraph`、taint 状态等内部信息。
+
+| 官方分类 | 典型 family | 默认状态 | 误报容忍度 | 工程定位 |
+| --- | --- | --- | --- | --- |
+| Default Checkers | `core`、`cplusplus`、`deadcode`、`security`、`unix`、`webkit` 等 | 面向常规分析使用 | 低 | 通用 C/C++ 缺陷、安全风险、API 误用、项目专用规则。 |
+| Experimental Checkers | `alpha.*` | 默认关闭 | 较高 | 新规则试验、专项调研、能力验证，不宜直接作为阻塞门禁。 |
+| Debug Checkers | `debug.*` | 默认关闭 | 不适用 | 调试 analyzer 内部结构，不面向用户缺陷报告。 |
+
+从社区演进角度看，一个 checker 通常先在 `alpha.*` 中验证规则边界和误报情况；当规则足够稳定、适用面明确、测试充分、误报可控后，才适合进入更稳定的 family 或被工程默认启用。
+
+## C/C++ Checker 按能力类型分类
+
+CSA checker 的能力边界由路径敏感符号执行、`ProgramState`、AST/CFG 建模和平台 API 模型共同决定。按漏洞或缺陷形态，可以归纳为以下几类：
+
+| 能力类型 | 代表 checker | 适合发现的问题 | 演进与误报特征 |
+| --- | --- | --- | --- |
+| 核心语言未定义行为 | `core.DivideZero`、`core.NullDereference`、`core.BitwiseShift`、`core.VLASize` | 除零、空指针、非法位移、非法 VLA 长度 | 通用性强，适合作为默认基础能力。 |
+| 未初始化值传播 | `core.uninitialized.*`、`core.UndefinedBinaryOperatorResult` | 未初始化值参与分支、赋值、返回、数组长度等 | 依赖路径和符号值推理，误报需通过约束和建模控制。 |
+| C/C++ 内存与资源生命周期 | `unix.Malloc`、`unix.Stream`、`cplusplus.NewDelete`、`cplusplus.NewDeleteLeaks`、`unix.MismatchedDeallocator` | 泄漏、重复释放、释放后使用、分配/释放器不匹配、close 后使用 | 最适合 CSA checker 的状态机类问题。 |
+| API 契约与参数约束 | `core.NonNullParamChecker`、`unix.StdCLibraryFunctions`、`security.insecureAPI.*` | 非空参数、返回值必须检查、危险 API、C/POSIX 标准库参数约束 | 规则清晰时适合默认启用；契约不稳定时更适合 optin/alpha。 |
+| C++ 对象生命周期 | `cplusplus.InnerPointer`、`cplusplus.Move`、`cplusplus.PureVirtualCall`、`cplusplus.StringChecker` | move 后使用、内部指针失效、构造/析构期虚调用 | 依赖 C++ 语义模型，复杂模板和库模型会影响精度。 |
+| 安全漏洞模式 | `security.ArrayBound`、`security.MmapWriteExec`、`security.SetgidSetuidOrder`、`optin.taint.*` | 越界、W+X 内存、降权顺序、污染数据流向 sink | 安全价值高，但污点规则和上下文建模决定误报。 |
+| 并发、锁与阻塞调用 | `unix.BlockInCriticalSection`、`alpha.core.C11Lock`、`alpha.unix.PthreadLock` | 临界区阻塞调用、C11/pthread lock 状态问题 | 通常适合专项启用，误报受锁模型完整性影响。 |
+| C/C++ 污点分析 | `optin.taint.GenericTaint`、`optin.taint.TaintedAlloc`、`optin.taint.TaintedDiv` | 不可信输入流向命令执行、分配大小、除数等 sink | 安全价值高，但 source/sink/sanitizer 配置决定有效性。 |
+| 项目专用 C++ 规则 | `webkit.*`、`alpha.webkit.*` | WebKit 引用计数、裸指针、lambda 捕获、局部变量生命周期约束 | 适合对应代码库；跨项目默认启用价值有限。 |
+| 结构性或风格规则 | `deadcode.DeadStores`、`optin.performance.Padding`、`alpha.llvm.Conventions` | 死存储、结构体 padding、LLVM 编码约定 | 未必需要路径敏感分析，门禁策略应谨慎。 |
+
+## 按演进状态分类
+
+| 演进状态 | 官方 checker 范围 | 进入条件 | 使用建议 |
+| --- | --- | --- | --- |
+| 默认稳定规则 | Default Checkers 中的通用 family | 问题定义清晰、适用面广、误报较低、有回归测试 | 可作为基础扫描能力，但仍建议先建立基线。 |
+| 主动启用规则 | `optin.*`、`optin.taint.*` 等 | 有价值但可能成本更高或适用面更窄 | 建议 report-only 试运行后再进入门禁。 |
+| 实验规则 | `alpha.*` | 规则仍在演进，可能崩溃或产生较多误报 | 用于调研、专项扫描或规则验证，不建议默认阻塞。 |
+| 调试规则 | `debug.*` | 观察 analyzer 内部结构 | 用于 checker 开发和问题定位，不用于缺陷治理。 |
+
+下面的 default family 细表保留 C/C++ 相关 checker 的功能说明；后文再列出 C/C++ 相关 `alpha.*` 和通用 `debug.*` checker 的社区提供范围。
 
 ## core
 
@@ -13,10 +53,10 @@
 | Checker | 支持语言 | 具体功能 |
 | --- | --- | --- |
 | `core.BitwiseShift` | C, C++ | 检查整数左移或右移导致的未定义行为，例如右操作数为负数、位移量超过左操作数类型位宽；pedantic 模式下还会检查更多有符号位移问题。 |
-| `core.CallAndMessage` | C, C++, ObjC | 检查函数调用和 Objective-C message 表达式中的逻辑错误，例如空函数指针、未初始化实参、空或未初始化的 `this`、Objective-C receiver 未初始化、实参数量不足等。 |
-| `core.DivideZero` | C, C++, ObjC | 检查除法或取模运算中除数可能为 0 的路径。 |
-| `core.NonNullParamChecker` | C, C++, ObjC | 检查向引用参数、`nonnull` 标注参数或系统 API 中声明为非空的参数传入空指针。 |
-| `core.NullDereference` | C, C++, ObjC | 检查空指针解引用，包括通过成员访问、数组访问、间接调用等方式触发的空指针访问。 |
+| `core.CallAndMessage` | C, C++ | 检查函数调用中的逻辑错误，例如空函数指针、未初始化实参、空或未初始化的 `this`、实参数量不足等。 |
+| `core.DivideZero` | C, C++ | 检查除法或取模运算中除数可能为 0 的路径。 |
+| `core.NonNullParamChecker` | C, C++ | 检查向引用参数、`nonnull` 标注参数或系统 API 中声明为非空的参数传入空指针。 |
+| `core.NullDereference` | C, C++ | 检查空指针解引用，包括通过成员访问、数组访问、间接调用等方式触发的空指针访问。 |
 | `core.NullPointerArithm` | C, C++ | 检查空指针参与指针算术，例如对空指针执行加减或数组下标运算。 |
 | `core.StackAddressEscape` | C | 检查栈上对象地址逃逸出其生命周期，例如返回局部变量地址、把局部变量地址写入全局变量、返回捕获局部变量的 block。 |
 | `core.UndefinedBinaryOperatorResult` | C | 检查二元运算结果未定义的情况，典型场景是操作数来自未初始化值。 |
@@ -52,15 +92,11 @@
 
 ## nullability
 
-`nullability` family 检查 `_Nullable`、`_Nonnull` 等空值契约被违反的路径。
+`nullability` family 主要面向带 nullability 注解的代码。官方列表中大多数规则偏 Objective-C；C/C++ 视角下主要关注可用于 C/C++ 的非空返回契约。
 
 | Checker | 支持语言 | 具体功能 |
 | --- | --- | --- |
-| `nullability.NullPassedToNonnull` | ObjC | 检查确定为 null 的指针被传给 `_Nonnull` 参数。 |
-| `nullability.NullReturnedFromNonnull` | C, C++, ObjC | 检查声明为 `_Nonnull` 返回类型的函数返回 null。 |
-| `nullability.NullableDereferenced` | ObjC | 检查 `_Nullable` 指针在没有充分判空的情况下被解引用。 |
-| `nullability.NullablePassedToNonnull` | ObjC | 检查 `_Nullable` 指针被传给 `_Nonnull` 参数。 |
-| `nullability.NullableReturnedFromNonnull` | ObjC | 检查声明为 `_Nonnull` 返回类型的函数返回 `_Nullable` 值。 |
+| `nullability.NullReturnedFromNonnull` | C, C++ | 检查声明为 `_Nonnull` 返回类型的函数返回 null。 |
 
 ## optin
 
@@ -69,15 +105,12 @@
 | Checker | 支持语言 | 具体功能 |
 | --- | --- | --- |
 | `optin.core.EnumCastOutOfRange` | C, C++ | 检查整数转换为枚举后没有对应枚举值的情况。 |
-| `optin.core.FixedAddressDereference` | C, C++, ObjC | 检查硬编码固定地址或可推导为固定数值地址的指针被解引用。 |
+| `optin.core.FixedAddressDereference` | C, C++ | 检查硬编码固定地址或可推导为固定数值地址的指针被解引用。 |
 | `optin.core.UnconditionalVAArg` | C, C++ | 检查可变参数函数中无条件调用 `va_arg()`，即如果调用方没有传入可变参数就会触发未定义行为的模式。 |
 | `optin.cplusplus.UninitializedObject` | C++ | 检查对象构造完成后成员或子对象仍未初始化的情况。 |
 | `optin.cplusplus.VirtualCall` | C++ | 检查构造或析构期间看似虚调用、实际受 C++ 构造析构规则限制而不会分派到派生类实现的调用。 |
 | `optin.mpi.MPI-Checker` | C | 检查 MPI 非阻塞请求使用问题，例如请求未等待、请求对象被复用、`MPI_Wait` 没有匹配的非阻塞操作。 |
-| `optin.osx.cocoa.localizability.EmptyLocalizationContextChecker` | ObjC | 检查 `NSLocalizedString` 等本地化宏缺少有效上下文注释。 |
-| `optin.osx.cocoa.localizability.NonLocalizedStringChecker` | ObjC | 检查传给用户界面 API 的字符串没有通过本地化宏处理。 |
-| `optin.performance.GCDAntipattern` | ObjC / Apple 平台 | 检查 Grand Central Dispatch 使用中的性能反模式。 |
-| `optin.performance.Padding` | C, C++, ObjC | 检查结构体存在过多 padding，可能浪费内存并影响缓存效率。 |
+| `optin.performance.Padding` | C, C++ | 检查结构体存在过多 padding，可能浪费内存并影响缓存效率。 |
 | `optin.portability.UnixAPI` | C / Unix | 检查 Unix API 的可移植性问题，例如零大小内存分配等在不同实现上行为可能不同的用法。 |
 
 ## optin.taint
@@ -88,7 +121,7 @@
 | --- | --- | --- |
 | `optin.taint.GenericTaint` | C, C++ | 检查受污染数据流向敏感 sink，例如命令执行、动态库加载、格式字符串、系统调用参数等。 |
 | `optin.taint.TaintedAlloc` | C, C++ | 检查受污染值作为内存分配大小，可能导致拒绝服务或异常资源消耗。 |
-| `optin.taint.TaintedDiv` | C, C++, ObjC | 检查受污染值作为除数，可能触发除零。 |
+| `optin.taint.TaintedDiv` | C, C++ | 检查受污染值作为除数，可能触发除零。 |
 
 ## security
 
@@ -103,7 +136,6 @@
 | `security.insecureAPI.bcmp` | C | 检查使用已废弃或不推荐的 `bcmp()`。 |
 | `security.insecureAPI.bcopy` | C | 检查使用已废弃或不推荐的 `bcopy()`。 |
 | `security.insecureAPI.bzero` | C | 检查使用已废弃或不推荐的 `bzero()`。 |
-| `security.insecureAPI.decodeValueOfObjCType` | C / ObjC | 检查不安全的 Objective-C 类型解码 API 使用。 |
 | `security.insecureAPI.getpw` | C | 检查使用不安全的 `getpw()`。 |
 | `security.insecureAPI.gets` | C | 检查使用无法限制输入长度的 `gets()`。 |
 | `security.insecureAPI.mkstemp` | C | 检查 `mkstemp()` 模板是否满足安全要求，例如末尾是否有足够数量的 `X`。 |
@@ -139,40 +171,6 @@
 | `unix.StdCLibraryFunctions` | C | 对 C 标准库和部分 POSIX 函数建模并检查参数约束，例如字符分类函数参数范围、缓冲区大小、返回值约束等。 |
 | `unix.Stream` | C | 检查 `FILE *` 流使用错误，例如空流、关闭后使用、文件流泄漏、EOF 后继续读、`fseek` 参数错误。 |
 
-## osx
-
-`osx` family 面向 macOS、Objective-C、Cocoa 和 CoreFoundation API。
-
-| Checker | 支持语言 | 具体功能 |
-| --- | --- | --- |
-| `osx.API` | C | 检查 Apple API 使用错误，例如 `dispatch_once()` 使用局部 predicate。 |
-| `osx.NumberObjectConversion` | C, C++, ObjC | 检查数字对象和标量数字之间的错误比较或转换，例如把 `NSNumber *` 当作整数比较。 |
-| `osx.ObjCProperty` | ObjC | 检查 Objective-C property 使用问题。 |
-| `osx.SecKeychainAPI` | C | 检查 Secure Keychain API 的分配、释放和错误路径处理，例如未释放返回数据、释放不匹配或错误释放。 |
-| `osx.cocoa.AtSync` | ObjC | 检查 `@synchronized` 使用 nil 或未初始化对象作为 mutex。 |
-| `osx.cocoa.AutoreleaseWrite` | ObjC | 检查向 autoreleasing 对象写入时可能跨 autorelease pool 导致崩溃的情况。 |
-| `osx.cocoa.ClassRelease` | ObjC | 检查直接向 Class 对象发送 `retain`、`release` 或 `autorelease`。 |
-| `osx.cocoa.Dealloc` | ObjC | 检查 Objective-C `-dealloc` 实现错误，例如缺少 `dealloc`、没有调用 `[super dealloc]`、retain/release 不匹配。 |
-| `osx.cocoa.IncompatibleMethodTypes` | ObjC | 检查 Objective-C 重写或实现的方法签名类型不兼容。 |
-| `osx.cocoa.Loops` | ObjC | 建模 Cocoa 集合循环和快速枚举相关行为，以支持对循环中对象使用的检查。 |
-| `osx.cocoa.MissingSuperCall` | ObjC | 检查要求调用 super 的 Objective-C 方法没有调用对应 super 实现。 |
-| `osx.cocoa.NSAutoreleasePool` | ObjC | 检查 `NSAutoreleasePool` 使用问题，例如 Objective-C GC 模式下低效或不合适的 autorelease pool 用法。 |
-| `osx.cocoa.NSError` | ObjC | 检查 `NSError **` 参数约定，例如错误对象输出参数的空值和返回值语义。 |
-| `osx.cocoa.NilArg` | ObjC | 检查向 Cocoa API 中不允许为 nil 的参数传入 nil。 |
-| `osx.cocoa.NonNilReturnValue` | ObjC | 建模保证返回非 nil 的 Cocoa API，帮助其他 checker 提高空值推理精度。 |
-| `osx.cocoa.ObjCGenerics` | ObjC | 检查 Objective-C 泛型容器的类型不匹配使用。 |
-| `osx.cocoa.RetainCount` | ObjC | 检查 Objective-C 和 CoreFoundation 引用计数错误，例如泄漏、过度释放、未按所有权规则释放。 |
-| `osx.cocoa.RunLoopAutoreleaseLeak` | ObjC | 检查 run loop 中 autorelease 对象可能因缺少 autorelease pool drain 而泄漏。 |
-| `osx.cocoa.SelfInit` | ObjC | 检查 initializer 中 `self` 初始化模式是否正确，例如没有使用 `[super init]` 的返回值。 |
-| `osx.cocoa.SuperDealloc` | ObjC | 检查 `[super dealloc]` 的调用顺序和使用规则。 |
-| `osx.cocoa.UnusedIvars` | ObjC | 检查未使用的私有 instance variable。 |
-| `osx.cocoa.VariadicMethodTypes` | ObjC | 检查 Objective-C 可变参数方法中传入非 Objective-C 对象等类型错误。 |
-| `osx.coreFoundation.CFError` | C | 检查 `CFErrorRef *` 输出参数使用约定。 |
-| `osx.coreFoundation.CFNumber` | C | 检查 `CFNumber` API 的数值类型、大小和转换使用错误。 |
-| `osx.coreFoundation.CFRetainRelease` | C | 检查 `CFRetain`、`CFRelease`、`CFMakeCollectable` 等 CoreFoundation 引用计数 API 的空参数或错误使用。 |
-| `osx.coreFoundation.containers.OutOfBounds` | C | 检查 `CFArray` 等 CoreFoundation 容器 API 的索引越界。 |
-| `osx.coreFoundation.containers.PointerSizedValues` | C | 检查 `CFArray`、`CFDictionary`、`CFSet` 等容器中把非指针大小的值当作指针值存储。 |
-
 ## fuchsia
 
 | Checker | 支持语言 | 具体功能 |
@@ -187,6 +185,73 @@
 | `webkit.NoUncountedMemberChecker` | WebKit | 检查类成员中保存未计数对象的裸指针或引用，避免对象生命周期没有被引用计数保护。 |
 | `webkit.UncountedLambdaCapturesChecker` | WebKit | 检查 lambda 捕获未计数对象的裸指针或引用，避免异步或延迟执行时出现悬空引用。 |
 
+## alpha experimental checkers
+
+`alpha.*` checker 是官方文档列出的实验性 checker。它们已经随社区代码提供，但默认关闭，适合用于专项调研、规则验证或在项目中进行非阻塞试运行。若要进入工程门禁，应先评估误报、崩溃风险、性能成本和源码适用范围。
+
+| Family | Checker | 主要方向 |
+| --- | --- | --- |
+| `alpha.clone` | `alpha.clone.CloneChecker` | 代码克隆或重复逻辑检测。 |
+| `alpha.core` | `alpha.core.BoolAssignment` | 条件表达式中可疑布尔赋值。 |
+| `alpha.core` | `alpha.core.C11Lock` | C11 lock API 使用问题。 |
+| `alpha.core` | `alpha.core.CastToStruct` | 可疑结构体类型转换。 |
+| `alpha.core` | `alpha.core.Conversion` | 可疑类型转换或隐式转换问题。 |
+| `alpha.core` | `alpha.core.PointerArithm` | 指针算术相关风险。 |
+| `alpha.core` | `alpha.core.StackAddressAsyncEscape` | 栈地址异步逃逸。 |
+| `alpha.core` | `alpha.core.StdVariant` | `std::variant` 使用相关检查。 |
+| `alpha.core` | `alpha.core.TestAfterDivZero` | 除零之后再测试除数的可疑路径。 |
+| `alpha.core` | `alpha.core.StoreToImmutable` | 向不可变对象或区域写入。 |
+| `alpha.cplusplus` | `alpha.cplusplus.DeleteWithNonVirtualDtor` | 通过非虚析构基类删除派生对象。 |
+| `alpha.cplusplus` | `alpha.cplusplus.InvalidatedIterator` | 迭代器失效后继续使用。 |
+| `alpha.cplusplus` | `alpha.cplusplus.IteratorRange` | 迭代器范围不匹配或非法范围。 |
+| `alpha.cplusplus` | `alpha.cplusplus.MismatchedIterator` | 来自不同容器或不匹配上下文的迭代器误用。 |
+| `alpha.cplusplus` | `alpha.cplusplus.SmartPtr` | 智能指针使用相关实验检查。 |
+| `alpha.deadcode` | `alpha.deadcode.UnreachableCode` | 不可达代码。 |
+| `alpha.fuchsia` | `alpha.fuchsia.Lock` | Fuchsia lock 使用相关检查。 |
+| `alpha.llvm` | `alpha.llvm.Conventions` | LLVM 项目编码约定。 |
+| `alpha.security` | `alpha.security.ReturnPtrRange` | 返回指针范围相关安全检查。 |
+| `alpha.unix` | `alpha.unix.PthreadLock` | pthread lock 使用错误。 |
+| `alpha.unix` | `alpha.unix.SimpleStream` | 简化版 stream 生命周期检查。 |
+| `alpha.unix.cstring` | `alpha.unix.cstring.BufferOverlap` | C 字符串或内存函数缓冲区重叠。 |
+| `alpha.unix.cstring` | `alpha.unix.cstring.OutOfBounds` | C 字符串或内存函数越界。 |
+| `alpha.webkit` | `alpha.webkit.ForwardDeclChecker` | WebKit 前向声明约定。 |
+| `alpha.webkit` | `alpha.webkit.MemoryUnsafeCastChecker` | WebKit 内存不安全类型转换。 |
+| `alpha.webkit` | `alpha.webkit.NoDeleteChecker` | WebKit 禁止 delete 或所有权约定相关检查。 |
+| `alpha.webkit` | `alpha.webkit.NoUncheckedPtrMemberChecker` | 成员中未受检查的指针使用。 |
+| `alpha.webkit` | `alpha.webkit.NoUnretainedMemberChecker` | 成员中未保留对象的生命周期风险。 |
+| `alpha.webkit` | `alpha.webkit.UnretainedLambdaCapturesChecker` | lambda 捕获未保留对象。 |
+| `alpha.webkit` | `alpha.webkit.UncountedCallArgsChecker` | 调用参数中未计数对象风险。 |
+| `alpha.webkit` | `alpha.webkit.UncheckedCallArgsChecker` | 调用参数中未检查指针风险。 |
+| `alpha.webkit` | `alpha.webkit.UncheckedLambdaCapturesChecker` | lambda 捕获未检查指针风险。 |
+| `alpha.webkit` | `alpha.webkit.UnretainedCallArgsChecker` | 调用参数中未保留对象风险。 |
+| `alpha.webkit` | `alpha.webkit.UncountedLocalVarsChecker` | 局部变量中未计数对象风险。 |
+| `alpha.webkit` | `alpha.webkit.UncheckedLocalVarsChecker` | 局部变量中未检查指针风险。 |
+| `alpha.webkit` | `alpha.webkit.UnretainedLocalVarsChecker` | 局部变量中未保留对象风险。 |
+| `alpha.webkit` | `webkit.RetainPtrCtorAdoptChecker` | WebKit `RetainPtr` adopt 构造约定。 |
+
+从能力类型看，`alpha.*` 中最接近 CSA 优势区间的是资源/生命周期、迭代器失效、锁状态、指针逃逸和 WebKit 所有权规则；更偏编码约定、克隆、局部模式的规则，即使进入社区，也不一定适合作为路径敏感 checker 的默认能力。
+
+## debug checkers
+
+`debug.*` checker 不用于发现用户代码缺陷，而用于观察 analyzer 的内部表示和执行过程。它们对开发自定义 checker、定位误报、理解路径探索非常有价值。
+
+| Checker | 作用 |
+| --- | --- |
+| `debug.AnalysisOrder` | 输出 analyzer 遍历和回调顺序。 |
+| `debug.ConfigDumper` | 输出 analyzer 配置。 |
+| `debug.DumpCFG` | 打印当前函数 CFG。 |
+| `debug.DumpCallGraph` | 打印调用图。 |
+| `debug.DumpCalls` | 打印调用相关信息。 |
+| `debug.DumpDominators` | 打印 dominator 信息。 |
+| `debug.DumpLiveVars` | 打印 live variables 信息。 |
+| `debug.DumpTraversal` | 打印遍历过程。 |
+| `debug.ExprInspection` | 支持 `clang_analyzer_*` 调试函数，用于 analyzer 回归测试和路径状态检查。 |
+| `debug.Stats` | 输出 analyzer 统计信息。 |
+| `debug.TaintTest` | 检查和展示 taint 状态传播。 |
+| `debug.ViewCFG` | 可视化 CFG。 |
+| `debug.ViewCallGraph` | 可视化调用图。 |
+| `debug.ViewExplodedGraph` | 可视化路径敏感分析产生的 `ExplodedGraph`。 |
+
 ## 使用建议
 
 实际项目中可以按风险分层启用：
@@ -198,7 +263,7 @@ flowchart TD
     C --> D{"报告质量是否稳定"}
     D -->|否| E["调整 checker、配置或 suppression"]
     E --> C
-    D -->|是| F["按风险加入 security / optin.taint / 平台规则"]
+    D -->|是| F["按风险加入 security / optin.taint / 平台或项目规则"]
     F --> G["只对新增高置信问题设置门禁"]
 ```
 
@@ -206,7 +271,7 @@ flowchart TD
 | --- | --- |
 | 基线层 | `core`、`cplusplus`、`deadcode`、`unix` 中与内存、空指针、未初始化值相关的规则。 |
 | 安全层 | `security`、`optin.taint`，用于发现危险 API、越界、污染输入流向敏感操作等问题。 |
-| 平台层 | `osx`、`fuchsia`、`webkit`，只在对应平台或项目代码中启用。 |
+| 平台/项目层 | `fuchsia`、`webkit`，只在对应 C/C++ 平台或项目代码中启用。 |
 | 质量与性能层 | `optin.performance.*`、`optin.core.*`、`nullability`，结合误报率逐步纳入门禁。 |
 
 如果要在命令行中查看当前 Clang 版本实际支持的 checker，优先使用本机工具确认：
